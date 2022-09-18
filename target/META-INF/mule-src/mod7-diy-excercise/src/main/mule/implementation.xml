@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<vm:config name="VM_Config" doc:name="VM Config" doc:id="d8afe217-eee7-4e51-88a7-378cec6eecae" >
+		<vm:queues >
+			<vm:queue queueName="TQueue" />
+		</vm:queues>
+	</vm:config>
+	<flow name="PrivateFlow1" doc:id="cdfd36db-2317-4f71-9d9f-095d6c5bf03d" >
+		<http:listener doc:name="POST /accounts" doc:id="b9aac84f-e0a2-4b73-885a-b2eb0bd39591" config-ref="HTTP_Listener_config" path="/accounts" allowedMethods="POST">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"accounts" : payload.accounts,
+	"size" : vars.size,
+	"user_id" : payload.user_id
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="752e92f9-6f16-4fbc-9019-24275f960cf7" />
+		<flow-ref doc:name="subflow" doc:id="cb003e46-3743-42b2-9baa-b0b2cc1de3cb" name="subflow"/>
+		<vm:publish queueName="TQueue" doc:name="Publish" doc:id="b5437007-4494-491b-a054-f58488c6c73e" config-ref="VM_Config" timeout="100">
+		</vm:publish>
+		<http:request method="GET" doc:name="Request" doc:id="b46e9ca8-bbd1-4aed-937a-39a383243d93" config-ref="HTTP_Request_configuration" path="/accounts">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"client_secret" : vars.client_secret,
+	"user_id" : vars.user_id,
+	"client_id" : vars.client_id
+}]]]></http:headers>
+		</http:request>
+		<flow-ref doc:name="subflow" doc:id="3fed19b5-845c-46ac-bb9c-cf49ac0b7b09" name="subflow"/>
+		<ee:transform doc:name="Transform Message" doc:id="f151fb73-b31c-41f5-95bc-1f7a97b01248" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	
+	message: 'Account created'
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="3622f6e3-c1e7-4262-96fe-a4039bcc9f21" />
+	</flow>
+	<sub-flow name="subflow" doc:id="cd56b255-2a30-4930-8fc8-506c50928ceb" >
+		<set-variable value="#[attributes.headers.user_id]" doc:name="user_id" doc:id="f628e264-9c6f-4a0c-a322-8f4a0df96029" variableName="user_id"/>
+		<set-variable value="#[attributes.headers.client_id]" doc:name="client_id" doc:id="ae9c093c-5507-4ead-82de-bbd106def807" variableName="client_id"/>
+		<set-variable value="#[attributes.headers.client_secret]" doc:name="client_secret" doc:id="d9218bd7-5ba0-42fa-ab4c-eabfa25d2951" variableName="client_secret"/>
+		<set-variable value="#[sizeOf(payload)]" doc:name="size" doc:id="f4753e1e-994f-41f5-96ae-10401c6fa60b" variableName="size" />
+	</sub-flow>
+	<flow name="GetAccounts" doc:id="a20c3af9-1d02-41f1-9a25-374828fc765a" >
+		<vm:listener queueName="TQueue" doc:name="Listener" doc:id="dc05dbcf-0a2d-4b15-80fd-b2327a0b2268" config-ref="VM_Config">
+			<vm:response >
+				<vm:content ><![CDATA[#[output application/json
+---
+{user_id: vars.userId,
+	    accounts: payload
+}]]]></vm:content>
+			</vm:response>
+		</vm:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="bb23211b-9f79-46ff-aa4c-2dc342f455f1" message="Start of application"/>
+		<flow-ref doc:name="subflow" doc:id="c0fc96f6-8df2-4678-94ce-9228c9714635" name="subflow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="26786823-d668-47e2-a812-e8c9d19420dc" message="End of application"/>
+	</flow>
+</mule>
